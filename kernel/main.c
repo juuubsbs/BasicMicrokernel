@@ -1,8 +1,7 @@
 #include "task.h"
 #include "scheduler.h"
 #include "memory.h"
-
-extern void uart_print(const char*);
+#include "uart.h"
 
 /*   Tasks   */
 
@@ -49,6 +48,9 @@ void kernel_main()
     memory_init();   // OBRIGATÓRIO
 
     uart_print("\n=== Kernel ===\n");
+    uart_print("Heap total: ");
+    uart_print_uint(memory_total());
+    uart_print(" bytes\n");
 
     xTaskCreate(task1, 2048, 1);
     xTaskCreate(task2, 2048, 1);
