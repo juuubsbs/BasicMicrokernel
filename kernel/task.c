@@ -18,6 +18,8 @@ void xTaskCreate(void (*task)(void),
     TCB *t = &tasks[task_count];
 
     t->stack = (uint8_t*)kmalloc(stack_size);
+    if (!t->stack)
+        return;
 
     uint64_t *sp = (uint64_t*)(t->stack + stack_size);
 
