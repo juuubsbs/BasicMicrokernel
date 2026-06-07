@@ -33,3 +33,23 @@ void xTaskCreate(void (*task)(void),
 
     task_count++;
 }
+
+void xTaskDelete(int task_index)
+{
+    /* Verifica se o índice é válido */
+    if (task_index < 0 || task_index >= task_count)
+        return;
+
+    TCB *t = &tasks[task_index];
+
+    /* Se a task tem uma stack alocada, liberamos a memória */
+    if (t->stack)
+    {
+        kfree(t->stack);
+        t->stack = 0; /* Zera o ponteiro por segurança */
+    }
+
+    /* Limpa os dados para invalidar a task no scheduler */
+    t->entry = 0;
+    t->priority = 0;
+}
