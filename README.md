@@ -7,6 +7,7 @@ sudo apt update && sudo apt install -y gcc-riscv64-unknown-elf binutils-riscv64-
 ```
 
 To execute the system, use the command `make beauty`, it sends the log messages to a log `.txt` file, also runs the system and cleans the memory before execution.
+To terminate the program, execute the shortcut `Ctrl + A` + `X`.
 
 ## Implemented functionalities
 
