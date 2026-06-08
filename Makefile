@@ -8,8 +8,10 @@ CFLAGS = -march=rv64gc -mabi=lp64 \
          -fno-stack-protector \
          -Wall -Iinclude
 
+# Etapa 7: Adicionados trap.o e timer.o na lista de objetos
 OBJS = start.o trap_entry.o context.o \
-       main.o task.o scheduler.o uart.o string.o memory.o
+       main.o task.o scheduler.o uart.o string.o memory.o \
+       trap.o timer.o
 
 all:
 	$(CROSS)gcc $(CFLAGS) -c boot/start.S
@@ -22,6 +24,10 @@ all:
 	$(CROSS)gcc $(CFLAGS) -c kernel/uart.c
 	$(CROSS)gcc $(CFLAGS) -c kernel/string.c
 	$(CROSS)gcc $(CFLAGS) -c kernel/memory.c
+	
+	# Novas linhas de compilação para o Timer e Trap Handler
+	$(CROSS)gcc $(CFLAGS) -c kernel/trap.c
+	$(CROSS)gcc $(CFLAGS) -c kernel/timer.c
 
 	$(CROSS)ld -T linker.ld $(OBJS) -o kernel.elf
 
