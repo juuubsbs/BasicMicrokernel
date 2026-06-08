@@ -27,3 +27,5 @@ extern int task_count;
 void xTaskCreate(void (*task)(void),
                  uint32_t stack_size,
                  int priority);
+
+void xTaskDelete(int task_index);
