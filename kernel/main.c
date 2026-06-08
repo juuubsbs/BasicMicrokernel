@@ -2,6 +2,7 @@
 #include "scheduler.h"
 #include "memory.h"
 #include "uart.h"
+#include "timer.h"
 
 extern void trap_entry(void);
 
