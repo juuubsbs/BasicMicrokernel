@@ -168,7 +168,7 @@ void memory_dump(void)
     block_t *current = free_list;
     int bloco_id = 1;
 
-    uart_print("\n===== MAPA REAL DO HEAP (FREE LIST) =====\n");
+    uart_print("\n===== MAPA HEAP =====\n");
     while (current)
     {
         uart_print("[Bloco ");
@@ -188,7 +188,7 @@ void memory_dump(void)
 
         current = current->next;
     }
-    uart_print("=========================================\n\n");
+    uart_print("=====================\n\n");
 }
 
 
