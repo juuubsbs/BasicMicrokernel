@@ -84,6 +84,9 @@ void kernel_main()
     // 5. Coalescência
     xTaskDelete(0);
     uart_print("Task 0 removida\n");
+
+    xTaskDelete(1);
+    uart_print("Task 1 removida\n");
     
     xTaskDelete(2);
     uart_print("Task 2 removida\n");
