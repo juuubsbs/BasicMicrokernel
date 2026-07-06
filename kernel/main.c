@@ -149,6 +149,18 @@ void kernel_main()
 
     uart_print("===========================================\n\n");
 
+    uart_print("\n=== FUNCIONALIDADES EXTRAS (BONUS) ===\n");
+
+    uart_print("\n[Bonus 1] Timestamps (created_at / modified_at)\n");
+    int fd_ts = create("/tmp/relatorio.txt");
+    uart_print("Logo apos create():\n");
+    fs_stat("/tmp/relatorio.txt");
+    write(fd_ts, "v1", 2);
+    uart_print("Apos write() (modified_at deve mudar):\n");
+    fs_stat("/tmp/relatorio.txt");
+
+    uart_print("=================================\n\n");
+
     // Inicialização definitiva do ambiente de execução preemptivo
     uart_print("Iniciando o Escalonador Preemptivo Round-Robin...\n");
     xTaskCreate(task1, 2048, 1);

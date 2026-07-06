@@ -19,6 +19,15 @@ Operações bit a bit (bitwise) em arrays de uint8_t para marcar se um inode/blo
 #define CLEAR_BIT(bitmap, i) (bitmap[(i) / 8] &= ~(1 << ((i) % 8)))
 #define TEST_BIT(bitmap, i)  (bitmap[(i) / 8] &   (1 << ((i) % 8)))
 
+/* Le o contador de ciclos do RISC-V (CSR time). Nao ha RTC nessa placa
+ * virtual do QEMU, entao usamos esse contador monotonico como timestamp
+ * (bonus: timestamps). */
+static inline uint64_t read_time(void) {
+    uint64_t t;
+    asm volatile("csrr %0, time" : "=r"(t));
+    return t;
+}
+
 /* GERENCIAMENTO DE INODES E BLOCOS*/
 
 uint32_t inode_alloc(void) {
@@ -103,11 +112,15 @@ int fs_init(void) {
     sb->block_size = BLOCK_SIZE;
     SET_BIT(block_bitmap, 0);
 
+    uint64_t boot_time = read_time();
+
     // Criando a Raiz "/" (Inode 0)
     uint32_t root_ino = inode_alloc();
     inode_table[root_ino].type = TYPE_DIR;
     inode_table[root_ino].size = 0;
     inode_table[root_ino].ref_count = 1;
+    inode_table[root_ino].created_at = boot_time;
+    inode_table[root_ino].modified_at = boot_time;
     for (int i = 0; i < 8; i++) inode_table[root_ino].blocks[i] = 0;
     g_root_ino = root_ino;
 
@@ -119,6 +132,8 @@ int fs_init(void) {
         inode_table[dir_ino].type = TYPE_DIR;
         inode_table[dir_ino].size = 0;
         inode_table[dir_ino].ref_count = 1;
+        inode_table[dir_ino].created_at = boot_time;
+        inode_table[dir_ino].modified_at = boot_time;
         for (int j = 0; j < 8; j++) inode_table[dir_ino].blocks[j] = 0;
 
         // Adiciona a pasta arrecem criada dentro da raiz
@@ -255,9 +270,12 @@ int mkdir(const char *path) {
     uint32_t new_ino = inode_alloc();
     if (new_ino == (uint32_t)-1) return -1;
 
+    uint64_t now = read_time();
     inode_table[new_ino].type = TYPE_DIR;
     inode_table[new_ino].size = 0;
     inode_table[new_ino].ref_count = 1;
+    inode_table[new_ino].created_at = now;
+    inode_table[new_ino].modified_at = now;
     for (int i = 0; i < 8; i++) inode_table[new_ino].blocks[i] = 0;
 
     add_dir_entry(parent_ino, name, new_ino);
@@ -274,9 +292,12 @@ int create(const char *path) {
     uint32_t new_ino = inode_alloc();
     if (new_ino == (uint32_t)-1) return -1;
 
+    uint64_t now = read_time();
     inode_table[new_ino].type = TYPE_FILE;
     inode_table[new_ino].size = 0;
     inode_table[new_ino].ref_count = 1;
+    inode_table[new_ino].created_at = now;
+    inode_table[new_ino].modified_at = now;
     for (int i = 0; i < 8; i++) inode_table[new_ino].blocks[i] = 0;
 
     add_dir_entry(parent_ino, name, new_ino);
@@ -318,6 +339,7 @@ int write(int fd, const void *buf, uint32_t size) {
     }
 
     inode->size = size;
+    inode->modified_at = read_time(); // bonus: timestamps
     return (int)size;
 }
 
@@ -396,5 +418,22 @@ int unlink(const char *path) {
     inode->type = 0;
 
     remove_dir_entry(parent_ino, name);
+    return 0;
+}
+
+/* API EXTRA (BONUS) */
+
+/* Imprime os metadados (tipo, tamanho, links, timestamps) do inode
+ * associado ao caminho. Util para demonstrar timestamps e ref_count. */
+int fs_stat(const char *path) {
+    inode_t *inode = path_lookup(path);
+    if (!inode) return -1;
+
+    uart_print("[stat] "); uart_print(path); uart_print("\n");
+    uart_print("  tipo: "); uart_print(inode->type == TYPE_DIR ? "diretorio" : "arquivo"); uart_print("\n");
+    uart_print("  tamanho: "); uart_print_uint(inode->size); uart_print(" bytes\n");
+    uart_print("  links (ref_count): "); uart_print_uint(inode->ref_count); uart_print("\n");
+    uart_print("  criado (tick): "); uart_print_uint(inode->created_at); uart_print("\n");
+    uart_print("  modificado (tick): "); uart_print_uint(inode->modified_at); uart_print("\n");
     return 0;
 }

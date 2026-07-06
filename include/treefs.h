@@ -22,8 +22,10 @@ typedef struct {
 typedef struct {
     uint32_t type;          // TYPE_FILE ou TYPE_DIR
     uint32_t size;          // Tamanho em bytes
-    uint32_t ref_count;     
+    uint32_t ref_count;
     uint32_t blocks[8];     // Ponteiros diretos para os blocos
+    uint64_t created_at;    // Timestamp de criacao (bonus)
+    uint64_t modified_at;   // Timestamp da ultima escrita (bonus)
 } inode_t;
 
 /* Entrada de Diretório (Associa um nome a um inode) */
@@ -41,3 +43,6 @@ int ls(const char *path);
 int unlink(const char *path);
 int read(int fd, void *buf, uint32_t size);
 int write(int fd, const void *buf, uint32_t size);
+
+/* API extra (bonus) */
+int fs_stat(const char *path); // imprime metadados do inode (tipo, tamanho, links, timestamps)
