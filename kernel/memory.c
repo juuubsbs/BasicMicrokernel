@@ -1,7 +1,10 @@
 #include "memory.h"
 #include "uart.h"
 
-#define HEAP_SIZE 0x10000
+/* Aumentado de 0x10000 para 0x40000: o disco virtual do TreeFS
+ * (bitmaps + tabela de inodes + area de dados) precisa de ~137KB
+ * contiguos, alem do espaco usado pelas stacks das tasks. */
+#define HEAP_SIZE 0x40000
 #define ALIGNMENT 8
 
 typedef struct block
