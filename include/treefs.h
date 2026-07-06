@@ -10,6 +10,13 @@
 #define TYPE_FILE 1
 #define TYPE_DIR  2
 
+/* Permissoes (bonus): rwx simplificado, sem distincao de usuario/grupo */
+#define PERM_READ  0x4
+#define PERM_WRITE 0x2
+#define PERM_EXEC  0x1
+#define PERM_DEFAULT_FILE (PERM_READ | PERM_WRITE)
+#define PERM_DEFAULT_DIR  (PERM_READ | PERM_WRITE | PERM_EXEC)
+
 /* Superblock */
 typedef struct {
     uint32_t magic;         // Assinatura do sistema (ex: 0x54524545 para "TREE")
@@ -23,6 +30,7 @@ typedef struct {
     uint32_t type;          // TYPE_FILE ou TYPE_DIR
     uint32_t size;          // Tamanho em bytes
     uint32_t ref_count;
+    uint32_t perm;          // Permissoes rwx simplificadas (bonus)
     uint32_t blocks[8];     // Ponteiros diretos para os blocos
     uint32_t indirect;      // Bloco de indices (bonus: blocos indiretos)
     uint64_t created_at;    // Timestamp de criacao (bonus)
@@ -49,3 +57,4 @@ int write(int fd, const void *buf, uint32_t size);
 int fs_stat(const char *path); // imprime metadados do inode (tipo, tamanho, links, timestamps)
 int open(const char *path);                          // fd == numero do inode
 int link(const char *oldpath, const char *newpath);   // link fisico (hard link)
+int chmod(const char *path, uint32_t mode);           // altera permissoes (PERM_READ|PERM_WRITE|PERM_EXEC)

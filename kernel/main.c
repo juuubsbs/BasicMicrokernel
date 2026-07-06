@@ -201,6 +201,33 @@ void kernel_main()
     uart_print(ok ? "OK, conteudo integro\n" : "FALHA na integridade\n");
     unlink("/tmp/arquivo_grande.bin");
 
+    uart_print("\n[Bonus 4] Permissoes (rwx simplificado por inode)\n");
+    int fd_perm = create("/tmp/protegido.txt");
+    write(fd_perm, "dado inicial", 12);
+    fs_stat("/tmp/protegido.txt");
+
+    uart_print("chmod(\"/tmp/protegido.txt\", PERM_READ): agora e somente leitura\n");
+    chmod("/tmp/protegido.txt", PERM_READ);
+    fs_stat("/tmp/protegido.txt");
+
+    int w_perm = write(fd_perm, "tentativa bloqueada", 19);
+    uart_print("write() sem permissao: ");
+    uart_print(w_perm < 0 ? "BLOQUEADO (retornou -1), como esperado\n" : "ERRO: nao deveria ter escrito\n");
+
+    char permbuf[16];
+    memset(permbuf, 0, sizeof(permbuf));
+    int r_perm = read(fd_perm, permbuf, 12);
+    permbuf[r_perm] = '\0';
+    uart_print("read() continua funcionando (permissao de leitura mantida): ");
+    uart_print(permbuf); uart_print("\n");
+
+    uart_print("chmod(\"/tmp/protegido.txt\", PERM_READ|PERM_WRITE): restaura escrita\n");
+    chmod("/tmp/protegido.txt", PERM_READ | PERM_WRITE);
+    int w_perm2 = write(fd_perm, "escrita restaurada", 18);
+    uart_print("write() apos restaurar permissao: ");
+    uart_print(w_perm2 >= 0 ? "sucesso\n" : "ERRO: deveria ter escrito\n");
+    unlink("/tmp/protegido.txt");
+
     uart_print("=================================\n\n");
 
     // Inicialização definitiva do ambiente de execução preemptivo

@@ -124,6 +124,7 @@ int fs_init(void) {
     inode_table[root_ino].type = TYPE_DIR;
     inode_table[root_ino].size = 0;
     inode_table[root_ino].ref_count = 1;
+    inode_table[root_ino].perm = PERM_DEFAULT_DIR;
     inode_table[root_ino].indirect = 0;
     inode_table[root_ino].created_at = boot_time;
     inode_table[root_ino].modified_at = boot_time;
@@ -138,6 +139,7 @@ int fs_init(void) {
         inode_table[dir_ino].type = TYPE_DIR;
         inode_table[dir_ino].size = 0;
         inode_table[dir_ino].ref_count = 1;
+        inode_table[dir_ino].perm = PERM_DEFAULT_DIR;
         inode_table[dir_ino].indirect = 0;
         inode_table[dir_ino].created_at = boot_time;
         inode_table[dir_ino].modified_at = boot_time;
@@ -281,6 +283,7 @@ int mkdir(const char *path) {
     inode_table[new_ino].type = TYPE_DIR;
     inode_table[new_ino].size = 0;
     inode_table[new_ino].ref_count = 1;
+    inode_table[new_ino].perm = PERM_DEFAULT_DIR;
     inode_table[new_ino].indirect = 0;
     inode_table[new_ino].created_at = now;
     inode_table[new_ino].modified_at = now;
@@ -304,6 +307,7 @@ int create(const char *path) {
     inode_table[new_ino].type = TYPE_FILE;
     inode_table[new_ino].size = 0;
     inode_table[new_ino].ref_count = 1;
+    inode_table[new_ino].perm = PERM_DEFAULT_FILE;
     inode_table[new_ino].indirect = 0;
     inode_table[new_ino].created_at = now;
     inode_table[new_ino].modified_at = now;
@@ -368,6 +372,7 @@ int write(int fd, const void *buf, uint32_t size) {
 
     inode_t *inode = &inode_table[fd];
     if (inode->type != TYPE_FILE) return -1;
+    if (!(inode->perm & PERM_WRITE)) return -1; // bonus: permissoes
 
     uint32_t blocks_needed = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
     if (blocks_needed > DIRECT_BLOCKS + PTRS_PER_BLOCK) return -1; // acima do suportado
@@ -396,6 +401,7 @@ int read(int fd, void *buf, uint32_t size) {
 
     inode_t *inode = &inode_table[fd];
     if (inode->type != TYPE_FILE) return -1;
+    if (!(inode->perm & PERM_READ)) return -1; // bonus: permissoes
 
     uint32_t to_read = size < inode->size ? size : inode->size;
     uint8_t *dst = (uint8_t *)buf;
@@ -520,8 +526,19 @@ int link(const char *oldpath, const char *newpath) {
     return 0;
 }
 
-/* Imprime os metadados (tipo, tamanho, links, timestamps) do inode
- * associado ao caminho. Util para demonstrar timestamps e ref_count. */
+/* Altera as permissoes (rwx) do inode associado ao caminho. Sem
+ * distincao de usuario/grupo, ja que nao ha suporte a multiplos
+ * usuarios (bonus: permissoes). */
+int chmod(const char *path, uint32_t mode) {
+    inode_t *inode = path_lookup(path);
+    if (!inode) return -1;
+
+    inode->perm = mode & (PERM_READ | PERM_WRITE | PERM_EXEC);
+    return 0;
+}
+
+/* Imprime os metadados (tipo, tamanho, links, permissoes, timestamps)
+ * do inode associado ao caminho. Util para demonstrar essas propriedades. */
 int fs_stat(const char *path) {
     inode_t *inode = path_lookup(path);
     if (!inode) return -1;
@@ -530,6 +547,14 @@ int fs_stat(const char *path) {
     uart_print("  tipo: "); uart_print(inode->type == TYPE_DIR ? "diretorio" : "arquivo"); uart_print("\n");
     uart_print("  tamanho: "); uart_print_uint(inode->size); uart_print(" bytes\n");
     uart_print("  links (ref_count): "); uart_print_uint(inode->ref_count); uart_print("\n");
+
+    char perm_str[4];
+    perm_str[0] = (inode->perm & PERM_READ)  ? 'r' : '-';
+    perm_str[1] = (inode->perm & PERM_WRITE) ? 'w' : '-';
+    perm_str[2] = (inode->perm & PERM_EXEC)  ? 'x' : '-';
+    perm_str[3] = '\0';
+    uart_print("  permissoes: "); uart_print(perm_str); uart_print("\n");
+
     uart_print("  criado (tick): "); uart_print_uint(inode->created_at); uart_print("\n");
     uart_print("  modificado (tick): "); uart_print_uint(inode->modified_at); uart_print("\n");
     return 0;

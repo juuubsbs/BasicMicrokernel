@@ -20,7 +20,17 @@ To terminate the program, execute the shortcut `Ctrl + A` + `X`.
 - Block Reuse
 - Block Split
 - Memory free
+- Hierarchical File System (TreeFS)
+- Inode and Block Management
+- Path Resolution
+- File Creation, Writing, Reading and Removal
+- Timestamps (Bonus)
+- Hard Links (Bonus)
+- Indirect Blocks (Bonus)
+- Permissions (Bonus)
 
+## Not implemented (Bonus)
 
-
-
+- Symbolic Links
+- Block Cache
+- Multiple Users Support
