@@ -34,6 +34,7 @@ typedef struct {
 
 /* API */
 int fs_init(void);
+inode_t *path_lookup(const char *path);
 int mkdir(const char *path);
 int create(const char *path);
 int ls(const char *path);
