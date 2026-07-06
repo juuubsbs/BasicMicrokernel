@@ -3,6 +3,8 @@
 #include "memory.h"
 #include "uart.h"
 #include "timer.h"
+#include "string.h"
+#include "treefs.h"
 
 extern void trap_entry(void);
 
@@ -99,6 +101,51 @@ void kernel_main()
     uart_print("Heap livre: "); uart_print_uint(memory_free()); uart_print(" bytes\n");
     uart_print("Fragmentacao: "); uart_print_uint(memory_fragmentation()); uart_print("%\n");
     memory_dump();
+
+    uart_print("===========================================\n\n");
+
+    uart_print("\n=== VALIDACAO DO TREEFS ===\n");
+
+    fs_init();
+
+    uart_print("\n[Cenario 1] Listagem da raiz -> ls(\"/\")\n");
+    ls("/");
+
+    uart_print("\n[Cenario 2] Criacao de diretorio -> mkdir(\"/home/aluno\")\n");
+    mkdir("/home/aluno");
+    ls("/home");
+
+    uart_print("\n[Cenario 3] Criacao de arquivo -> create(\"/home/aluno/notas.txt\")\n");
+    int fd = create("/home/aluno/notas.txt");
+    uart_print("fd (inode) retornado: "); uart_print_uint((uint64_t)fd); uart_print("\n");
+
+    uart_print("\n[Cenario 4] Escrita -> write(fd, \"Sistemas Operacionais\", 22)\n");
+    write(fd, "Sistemas Operacionais", 22);
+    uart_print("Escrita concluida.\n");
+
+    uart_print("\n[Cenario 5] Leitura -> read(fd, buffer, 22)\n");
+    char buffer[64];
+    memset(buffer, 0, sizeof(buffer));
+    int lidos = read(fd, buffer, 22);
+    buffer[lidos] = '\0';
+    uart_print("Conteudo lido: "); uart_print(buffer); uart_print("\n");
+
+    uart_print("\n[Cenario 6] Remocao -> unlink(\"/home/aluno/notas.txt\")\n");
+    unlink("/home/aluno/notas.txt");
+    uart_print("ls(\"/home/aluno\") apos remocao:\n");
+    ls("/home/aluno");
+
+    uart_print("\n[Cenario 7] Navegacao hierarquica -> ls(\"/home\")\n");
+    ls("/home");
+
+    uart_print("\n[Cenario 8] Reutilizacao de inodes/blocos liberados\n");
+    int fd2 = create("/home/aluno/outro.txt");
+    uart_print("Novo fd apos remocao anterior (deve reaproveitar o inode liberado): ");
+    uart_print_uint((uint64_t)fd2); uart_print("\n");
+    write(fd2, "Reuso de bloco", 14);
+    inode_t *outro = path_lookup("/home/aluno/outro.txt");
+    uart_print("Bloco de dados reaproveitado: ");
+    uart_print_uint((uint64_t)outro->blocks[0]); uart_print("\n");
 
     uart_print("===========================================\n\n");
 

@@ -9,9 +9,10 @@ CFLAGS = -march=rv64gc -mabi=lp64 \
          -Wall -Iinclude
 
 # Etapa 7: Adicionados trap.o e timer.o na lista de objetos
+# Etapa M3: Adicionado treefs.o (sistema de arquivos hierarquico)
 OBJS = start.o trap_entry.o context.o \
        main.o task.o scheduler.o uart.o string.o memory.o \
-       trap.o timer.o
+       trap.o timer.o treefs.o
 
 all:
 	$(CROSS)gcc $(CFLAGS) -c boot/start.S
@@ -24,10 +25,13 @@ all:
 	$(CROSS)gcc $(CFLAGS) -c kernel/uart.c
 	$(CROSS)gcc $(CFLAGS) -c kernel/string.c
 	$(CROSS)gcc $(CFLAGS) -c kernel/memory.c
-	
+
 	# Novas linhas de compilação para o Timer e Trap Handler
 	$(CROSS)gcc $(CFLAGS) -c kernel/trap.c
 	$(CROSS)gcc $(CFLAGS) -c kernel/timer.c
+
+	# Sistema de arquivos hierarquico (TreeFS)
+	$(CROSS)gcc $(CFLAGS) -c kernel/treefs.c
 
 	$(CROSS)ld -T linker.ld $(OBJS) -o kernel.elf
 
