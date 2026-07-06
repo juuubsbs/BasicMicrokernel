@@ -24,6 +24,7 @@ typedef struct {
     uint32_t size;          // Tamanho em bytes
     uint32_t ref_count;
     uint32_t blocks[8];     // Ponteiros diretos para os blocos
+    uint32_t indirect;      // Bloco de indices (bonus: blocos indiretos)
     uint64_t created_at;    // Timestamp de criacao (bonus)
     uint64_t modified_at;   // Timestamp da ultima escrita (bonus)
 } inode_t;

@@ -28,6 +28,11 @@ static inline uint64_t read_time(void) {
     return t;
 }
 
+/* Quantidade de blocos diretos e de ponteiros que cabem no bloco indireto
+ * (bonus: blocos indiretos). Com BLOCK_SIZE=512, PTRS_PER_BLOCK=128. */
+#define DIRECT_BLOCKS 8
+#define PTRS_PER_BLOCK (BLOCK_SIZE / sizeof(uint32_t))
+
 /* GERENCIAMENTO DE INODES E BLOCOS*/
 
 uint32_t inode_alloc(void) {
@@ -119,6 +124,7 @@ int fs_init(void) {
     inode_table[root_ino].type = TYPE_DIR;
     inode_table[root_ino].size = 0;
     inode_table[root_ino].ref_count = 1;
+    inode_table[root_ino].indirect = 0;
     inode_table[root_ino].created_at = boot_time;
     inode_table[root_ino].modified_at = boot_time;
     for (int i = 0; i < 8; i++) inode_table[root_ino].blocks[i] = 0;
@@ -132,6 +138,7 @@ int fs_init(void) {
         inode_table[dir_ino].type = TYPE_DIR;
         inode_table[dir_ino].size = 0;
         inode_table[dir_ino].ref_count = 1;
+        inode_table[dir_ino].indirect = 0;
         inode_table[dir_ino].created_at = boot_time;
         inode_table[dir_ino].modified_at = boot_time;
         for (int j = 0; j < 8; j++) inode_table[dir_ino].blocks[j] = 0;
@@ -274,6 +281,7 @@ int mkdir(const char *path) {
     inode_table[new_ino].type = TYPE_DIR;
     inode_table[new_ino].size = 0;
     inode_table[new_ino].ref_count = 1;
+    inode_table[new_ino].indirect = 0;
     inode_table[new_ino].created_at = now;
     inode_table[new_ino].modified_at = now;
     for (int i = 0; i < 8; i++) inode_table[new_ino].blocks[i] = 0;
@@ -296,6 +304,7 @@ int create(const char *path) {
     inode_table[new_ino].type = TYPE_FILE;
     inode_table[new_ino].size = 0;
     inode_table[new_ino].ref_count = 1;
+    inode_table[new_ino].indirect = 0;
     inode_table[new_ino].created_at = now;
     inode_table[new_ino].modified_at = now;
     for (int i = 0; i < 8; i++) inode_table[new_ino].blocks[i] = 0;
@@ -309,6 +318,51 @@ int create(const char *path) {
 
 /* ESCRITA E LEITURA DE ARQUIVOS */
 
+/* Traduz o indice logico de bloco do arquivo (0, 1, 2...) para o numero
+ * do bloco fisico no disco virtual, alocando blocos (inclusive o bloco
+ * de indices indireto) sob demanda. (bonus: blocos indiretos) */
+static int block_for_write(inode_t *inode, uint32_t index) {
+    if (index < DIRECT_BLOCKS) {
+        if (inode->blocks[index] == 0) {
+            int blk = block_alloc();
+            if (blk < 0) return -1;
+            inode->blocks[index] = (uint32_t)blk;
+        }
+        return (int)inode->blocks[index];
+    }
+
+    uint32_t ind_index = index - DIRECT_BLOCKS;
+    if (ind_index >= PTRS_PER_BLOCK) return -1; // acima do limite suportado
+
+    if (inode->indirect == 0) {
+        int blk = block_alloc();
+        if (blk < 0) return -1;
+        inode->indirect = (uint32_t)blk;
+        memset(data_blocks + ((uint32_t)blk * BLOCK_SIZE), 0, BLOCK_SIZE);
+    }
+
+    uint32_t *ptrs = (uint32_t *)(data_blocks + (inode->indirect * BLOCK_SIZE));
+    if (ptrs[ind_index] == 0) {
+        int blk = block_alloc();
+        if (blk < 0) return -1;
+        ptrs[ind_index] = (uint32_t)blk;
+    }
+    return (int)ptrs[ind_index];
+}
+
+/* Mesma traducao, mas somente leitura: nunca aloca blocos novos. */
+static int block_for_read(inode_t *inode, uint32_t index) {
+    if (index < DIRECT_BLOCKS) {
+        return (int)inode->blocks[index];
+    }
+
+    uint32_t ind_index = index - DIRECT_BLOCKS;
+    if (inode->indirect == 0) return -1;
+
+    uint32_t *ptrs = (uint32_t *)(data_blocks + (inode->indirect * BLOCK_SIZE));
+    return (int)ptrs[ind_index];
+}
+
 int write(int fd, const void *buf, uint32_t size) {
     if (fd < 0 || fd >= MAX_INODES) return -1;
 
@@ -316,20 +370,14 @@ int write(int fd, const void *buf, uint32_t size) {
     if (inode->type != TYPE_FILE) return -1;
 
     uint32_t blocks_needed = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
-    if (blocks_needed > 8) return -1; // apenas blocos diretos (sem indirecao)
+    if (blocks_needed > DIRECT_BLOCKS + PTRS_PER_BLOCK) return -1; // acima do suportado
 
     const uint8_t *src = (const uint8_t *)buf;
     uint32_t remaining = size;
 
     for (uint32_t i = 0; i < blocks_needed; i++) {
-        int blk;
-        if (inode->blocks[i] != 0) {
-            blk = (int)inode->blocks[i]; // reaproveita bloco ja alocado
-        } else {
-            blk = block_alloc();
-            if (blk < 0) return -1;
-            inode->blocks[i] = (uint32_t)blk;
-        }
+        int blk = block_for_write(inode, i);
+        if (blk < 0) return -1;
 
         uint32_t chunk = remaining < BLOCK_SIZE ? remaining : BLOCK_SIZE;
         memcpy(data_blocks + ((uint32_t)blk * BLOCK_SIZE), src, chunk);
@@ -355,10 +403,11 @@ int read(int fd, void *buf, uint32_t size) {
     uint32_t i = 0;
 
     while (remaining > 0) {
-        uint32_t blk = inode->blocks[i];
-        uint32_t chunk = remaining < BLOCK_SIZE ? remaining : BLOCK_SIZE;
+        int blk = block_for_read(inode, i);
+        if (blk < 0) break;
 
-        memcpy(dst, data_blocks + (blk * BLOCK_SIZE), chunk);
+        uint32_t chunk = remaining < BLOCK_SIZE ? remaining : BLOCK_SIZE;
+        memcpy(dst, data_blocks + ((uint32_t)blk * BLOCK_SIZE), chunk);
 
         dst += chunk;
         remaining -= chunk;
@@ -408,9 +457,23 @@ int unlink(const char *path) {
     if (inode->type != TYPE_FILE) return -1; // remocao de diretorios nao suportada (rmdir)
 
     uint32_t nblocks = (inode->size + BLOCK_SIZE - 1) / BLOCK_SIZE;
-    for (uint32_t i = 0; i < nblocks; i++) {
+    uint32_t direct_blocks = nblocks < DIRECT_BLOCKS ? nblocks : DIRECT_BLOCKS;
+
+    for (uint32_t i = 0; i < direct_blocks; i++) {
         block_free(inode->blocks[i]);
         inode->blocks[i] = 0;
+    }
+
+    // Bonus: libera tambem os blocos apontados pelo bloco indireto
+    if (inode->indirect != 0) {
+        uint32_t *ptrs = (uint32_t *)(data_blocks + (inode->indirect * BLOCK_SIZE));
+        uint32_t indirect_blocks = nblocks > DIRECT_BLOCKS ? nblocks - DIRECT_BLOCKS : 0;
+
+        for (uint32_t i = 0; i < indirect_blocks; i++) {
+            if (ptrs[i] != 0) block_free(ptrs[i]);
+        }
+        block_free(inode->indirect);
+        inode->indirect = 0;
     }
 
     inode_free((uint32_t)ino);

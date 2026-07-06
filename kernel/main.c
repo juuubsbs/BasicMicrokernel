@@ -159,6 +159,26 @@ void kernel_main()
     uart_print("Apos write() (modified_at deve mudar):\n");
     fs_stat("/tmp/relatorio.txt");
 
+    uart_print("\n[Bonus 3] Blocos indiretos (arquivo maior que 8 blocos diretos)\n");
+    static uint8_t big_out[5000];
+    static uint8_t big_in[5000];
+    for (uint32_t i = 0; i < sizeof(big_out); i++) big_out[i] = (uint8_t)('A' + (i % 26));
+
+    int fd_big = create("/tmp/arquivo_grande.bin");
+    write(fd_big, big_out, sizeof(big_out));
+
+    memset(big_in, 0, sizeof(big_in));
+    read(fd_big, big_in, sizeof(big_in));
+
+    int ok = 1;
+    for (uint32_t i = 0; i < sizeof(big_out); i++) {
+        if (big_out[i] != big_in[i]) { ok = 0; break; }
+    }
+    uart_print("Arquivo de "); uart_print_uint(sizeof(big_out));
+    uart_print(" bytes (8 blocos diretos + indiretos): ");
+    uart_print(ok ? "OK, conteudo integro\n" : "FALHA na integridade\n");
+    unlink("/tmp/arquivo_grande.bin");
+
     uart_print("=================================\n\n");
 
     // Inicialização definitiva do ambiente de execução preemptivo
