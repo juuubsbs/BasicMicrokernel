@@ -159,6 +159,28 @@ void kernel_main()
     uart_print("Apos write() (modified_at deve mudar):\n");
     fs_stat("/tmp/relatorio.txt");
 
+    uart_print("\n[Bonus 2] Links fisicos (hard links)\n");
+    int fd_a = create("/home/aluno/a.txt");
+    write(fd_a, "compartilhado", 13);
+    link("/home/aluno/a.txt", "/home/aluno/b.txt");
+    uart_print("Apos link(a.txt, b.txt), ls(\"/home/aluno\"):\n");
+    ls("/home/aluno");
+    uart_print("Metadados de a.txt (ref_count deve ser 2):\n");
+    fs_stat("/home/aluno/a.txt");
+
+    uart_print("unlink(a.txt): conteudo deve continuar acessivel via b.txt\n");
+    unlink("/home/aluno/a.txt");
+    int fd_b = open("/home/aluno/b.txt");
+    char linkbuf[16];
+    memset(linkbuf, 0, sizeof(linkbuf));
+    int n_link = read(fd_b, linkbuf, 13);
+    linkbuf[n_link] = '\0';
+    uart_print("Conteudo lido via b.txt: "); uart_print(linkbuf); uart_print("\n");
+    fs_stat("/home/aluno/b.txt");
+
+    uart_print("unlink(b.txt): agora libera o inode de fato (era o ultimo link)\n");
+    unlink("/home/aluno/b.txt");
+
     uart_print("\n[Bonus 3] Blocos indiretos (arquivo maior que 8 blocos diretos)\n");
     static uint8_t big_out[5000];
     static uint8_t big_in[5000];

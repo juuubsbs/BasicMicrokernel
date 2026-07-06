@@ -47,3 +47,5 @@ int write(int fd, const void *buf, uint32_t size);
 
 /* API extra (bonus) */
 int fs_stat(const char *path); // imprime metadados do inode (tipo, tamanho, links, timestamps)
+int open(const char *path);                          // fd == numero do inode
+int link(const char *oldpath, const char *newpath);   // link fisico (hard link)

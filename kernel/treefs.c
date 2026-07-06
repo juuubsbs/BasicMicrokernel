@@ -456,6 +456,14 @@ int unlink(const char *path) {
     inode_t *inode = &inode_table[ino];
     if (inode->type != TYPE_FILE) return -1; // remocao de diretorios nao suportada (rmdir)
 
+    // Remove sempre a entrada de diretorio referente a este nome/caminho
+    remove_dir_entry(parent_ino, name);
+
+    // Bonus: links fisicos. So libera blocos/inode quando nao sobra
+    // nenhum outro nome apontando para este inode.
+    if (inode->ref_count > 0) inode->ref_count--;
+    if (inode->ref_count > 0) return 0;
+
     uint32_t nblocks = (inode->size + BLOCK_SIZE - 1) / BLOCK_SIZE;
     uint32_t direct_blocks = nblocks < DIRECT_BLOCKS ? nblocks : DIRECT_BLOCKS;
 
@@ -480,11 +488,37 @@ int unlink(const char *path) {
     inode->size = 0;
     inode->type = 0;
 
-    remove_dir_entry(parent_ino, name);
     return 0;
 }
 
 /* API EXTRA (BONUS) */
+
+/* Reabre um arquivo existente pelo caminho, devolvendo o mesmo fd que
+ * create() teria devolvido (fd == numero do inode). */
+int open(const char *path) {
+    inode_t *inode = path_lookup(path);
+    if (!inode || inode->type != TYPE_FILE) return -1;
+    return (int)(inode - inode_table);
+}
+
+/* Cria um novo nome (newpath) apontando para o mesmo inode de oldpath,
+ * incrementando ref_count. Link fisico: so funciona dentro do mesmo
+ * disco virtual e apenas para arquivos (bonus). */
+int link(const char *oldpath, const char *newpath) {
+    inode_t *target = path_lookup(oldpath);
+    if (!target || target->type != TYPE_FILE) return -1;
+
+    uint32_t parent_ino;
+    char name[MAX_FILENAME];
+    if (split_parent(newpath, &parent_ino, name) < 0) return -1;
+    if (find_entry(parent_ino, name) >= 0) return -1; // duplicidade
+
+    uint32_t target_ino = (uint32_t)(target - inode_table);
+    add_dir_entry(parent_ino, name, target_ino);
+    target->ref_count++;
+
+    return 0;
+}
 
 /* Imprime os metadados (tipo, tamanho, links, timestamps) do inode
  * associado ao caminho. Util para demonstrar timestamps e ref_count. */
